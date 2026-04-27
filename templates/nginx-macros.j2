@@ -1,0 +1,20 @@
+
+{% macro render_ssl_ciphers(base, extra=[]) -%}
+    {% set final_list = base + extra %}
+    ssl_ciphers '{{ final_list | join(":") }}';
+{%- endmacro %}
+
+{% macro render_csp(base, extra={}) -%}
+    {% set policy_dict = base | combine(extra, recursive=True) %}
+    {% set header_parts = [] %}
+
+    {% for directive, values in policy_dict.items() %}
+        {% if values %}
+            {% set _ = header_parts.append(directive ~ " " ~ values | join(' ')) %}
+        {% else %}
+            {% set _ = header_parts.append(directive) %}
+        {% endif %}
+    {% endfor %}
+
+    add_header Content-Security-Policy "{{ header_parts | join('; ') }};" always;
+{%- endmacro %}
