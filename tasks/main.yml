@@ -1,4 +1,11 @@
 ---
+
+- name: Assert php_version is set
+  ansible.builtin.assert:
+    that:
+      - php_version | length > 0
+    fail_msg: php_version is not defined
+
 # Variable setup.
 - name: Include OS-specific variables.
   include_vars: "{{ ansible_facts.os_family }}.yml"

@@ -16,6 +16,9 @@ server {
     root /var/www/{{ item.server_name }}/{{ item.public_dir|default('') }};
     index index.php index.html index.htm;
 
+    access_log /var/log/nginx/{{ item.server_name }}.access.log combined {% if item.debug_mode is defined and item.debug_mode %}buffer=64k flush=5s{% else %}buffer=32k flush=1m{% endif %};
+    error_log /var/log/nginx/{{ item.server_name }}.error.log warn;
+
     add_header X-Frame-Options SAMEORIGIN;
     add_header X-Content-Type-Options nosniff;
     add_header X-XSS-Protection "1; mode=block";
@@ -26,10 +29,11 @@ server {
 
     server_tokens off;
 
-    {% for ip in cloudflare_ips %}
+    {% for ip in (cloudflare_ips | default([])) %}
     set_real_ip_from {{ ip }};
     {% endfor %}
     real_ip_header CF-Connecting-IP;
+    real_ip_recursive on;
 
     location / {
         try_files $uri $uri/ /index.php;
@@ -37,12 +41,18 @@ server {
 
     # PHP-FPM
     location ~ \.php$ {
-        fastcgi_pass unix:/run/php/php{{ php_version_string }}-fpm.sock;
+        fastcgi_pass unix:/run/php/php{{ php_version }}-fpm.sock;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include fastcgi_params;
         include snippets/fastcgi-php.conf;
-        fastcgi_param SERVER_ADDR {{ ipv4_address }};
-        fastcgi_param REMOTE_ADDR $http_x_forwarded_for;
+        fastcgi_param SERVER_ADDR {{ ansible_default_ipv4.address | default('127.0.0.1') }};
+        fastcgi_param REMOTE_ADDR $remote_addr;
+        # Cloudflare terminates TLS at the edge. Tell PHP-FPM it's https so web app
+        # generates absolute URLs with https:// and sets secure cookies.
+        fastcgi_param HTTPS on;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $http_x_forwarded_proto;
+        fastcgi_param HTTP_CF_CONNECTING_IP $http_cf_connecting_ip;
+        fastcgi_param HTTP_CF_RAY $http_cf_ray;
 
         {% if item.extra_php_parameters is defined %}
             {{ item.extra_parameters|indent(8) }}
