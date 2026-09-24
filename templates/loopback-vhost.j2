@@ -1,0 +1,49 @@
+{% from "nginx-macros.j2" import render_ssl_ciphers, render_csp with context %}
+
+server {
+    listen 127.0.0.1:10443 ssl;
+    http2 on;
+    server_name {{ item.server_name }};
+
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_timeout 5m;
+    ssl_protocols TLSv1.3 TLSv1.2;
+    {{ render_ssl_ciphers(nginx_ssl_ciphers, item.ssl_ciphers|default([]))|indent(4) }}
+    ssl_prefer_server_ciphers on;
+    ssl_dhparam /etc/nginx/dh{{ nginx_dh_size }}.pem;
+
+    root /var/www/{{ item.server_name }}/{{ item.public_dir|default('') }};
+    index index.php index.html index.htm;
+
+    access_log /var/log/nginx/{{ item.server_name }}-loopback.access.log combined;
+    error_log /var/log/nginx/{{ item.server_name }}-loopback.error.log warn;
+
+    add_header X-Frame-Options SAMEORIGIN;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    {{ render_csp(nginx_csp_policies, item.csp_policies|default({}))|indent(4) }}
+
+    client_max_body_size {{ nginx_client_max_body_size | default('16m') }};
+    large_client_header_buffers 4 32k;
+    server_tokens off;
+
+    location / {
+        try_files $uri $uri/ /index.php;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php{{ php_version }}-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+        include snippets/fastcgi-php.conf;
+        fastcgi_buffer_size 32k;
+        fastcgi_buffers 16 16k;
+        fastcgi_busy_buffers_size 64k;
+        fastcgi_param HTTPS on;
+        fastcgi_param HTTP_X_FORWARDED_PROTO https;
+    }
+
+    {% if item.extra_parameters is defined %}
+        {{ item.extra_parameters|indent(4) }}
+    {% endif %}
+}
