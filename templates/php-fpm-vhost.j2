@@ -13,7 +13,11 @@ server {
     ssl_prefer_server_ciphers on;
     ssl_dhparam /etc/nginx/dh{{ nginx_dh_size }}.pem;
 
+    {% if item.root is defined %}
+    root {{ item.root }};
+    {% else %}
     root /var/www/{{ item.server_name }}/{{ item.public_dir|default('') }};
+    {% endif %}
     index index.php index.html index.htm;
 
     access_log /var/log/nginx/{{ item.server_name }}.access.log combined {% if item.debug_mode is defined and item.debug_mode %}buffer=64k flush=5s{% else %}buffer=32k flush=1m{% endif %};
