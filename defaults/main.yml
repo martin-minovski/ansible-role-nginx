@@ -127,6 +127,8 @@ nginx_csp_policies:
     - "'self'"
   form-action:
     - "'self'"
+  frame-src:
+    - "'self'"
   # Boolean directives (no values) are empty lists
   upgrade-insecure-requests: []
 

@@ -39,9 +39,11 @@ server {
     real_ip_header CF-Connecting-IP;
     real_ip_recursive on;
 
+    {% block front_controller %}
     location / {
         try_files $uri $uri/ /index.php;
     }
+    {% endblock %}
 
     # PHP-FPM
     location ~ \.php$ {
@@ -71,3 +73,4 @@ server {
         {{ item.extra_parameters|indent(4) }}
     {% endif %}
 }
+
